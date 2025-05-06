@@ -12,7 +12,7 @@
 	title1 color="blue" "Sample from SASHELP.HOMEEQUITY";
 	title2 height=3 "First 20 of &N Rows";
 	data sample;
-	    set sashelp.homeequity(obs=15 keep=Bad Loan MortDue Value);
+	    set sashelp.homeequity(obs=20 keep=Bad Loan MortDue Value);
 	run;
 %end;
 
