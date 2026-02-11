@@ -1,39 +1,70 @@
-/* Selection options are FIRST (first rows) or RANDOM (random sample) */
-%let selection=FIRST;
+%let selection = FIRST;   /* FIRST ou RANDOM */
+%let N = 20;
+%let seed = 12345;
 
-/* GET TOTAL ROW COUNT FROM TABLE */
-	
-	proc sql noprint;
-	    select count(*) format=comma15. into :N from sashelp.homeequity;
-	quit;
+%let selection = %upcase(%superq(selection));
 
-/* SELECT FIRST 20 ROWS */
-%if &selection=FIRST %then %do;
-	title1 color="#545B66" "Sample from SASHELP.HOMEEQUITY";
-	title2 height=3 "First 20 of &N Rows";
-	data sample;
-	    set sashelp.homeequity(obs=20 keep=Bad Loan MortDue Value);
-	run;
+/* Validação */
+%if not (&selection = FIRST or &selection = RANDOM) %then %do;
+  %put ERROR: SELECTION deve ser FIRST ou RANDOM. Valor atual=&selection;
+  %abort cancel;
 %end;
 
-/* SELECT RANDOM SAMPLE OF 20 ROWS */
+/* FIRST: ObsNum sequencial (1..N) */
+%if &selection = FIRST %then %do;
 
-%else %do;
-	title1 color="#545B66" "Sample from SASHELP.HOMEEQUITY";
-	title2 height=3 "Random Sample 20 of &N Rows";
-	
-	proc surveyselect data=sashelp.homeequity(keep=Bad Loan MortDue Value) 
-	                  method=srs n=20
-	                  out=sample noprint;
-	run;  
-%end; 
+  title1 color="#545B66" "Sample from SASHELP.HOMEEQUITY";
+  title2 height=3 "First &N Rows (ObsNum is sequential)";
 
-/* PRINT SAMPLE */
+  data sample;
+    retain ObsNum;
+    set sashelp.homeequity(obs=&N keep=Bad Loan MortDue Value);
+    ObsNum = _N_;
+  run;
 
-	footnote height=3 "Created %sysfunc(today(),nldatew.) at %sysfunc(time(), nltime.)";
-	proc print data=sample noobs;
-	run;
-	title;
-	footnote;
+%end;
 
-/* END */
+/* RANDOM: ObsNum aleatório (número da obs original) */
+%if &selection = RANDOM %then %do;
+
+  title1 color="#545B66" "Sample from SASHELP.HOMEEQUITY";
+  title2 height=3 "Random &N Rows (ObsNum is original row number)";
+
+  /* 1) Cria uma “tabela índice” com o número real da observação */
+  data _home_idx;
+    set sashelp.homeequity(keep=Bad Loan MortDue Value);
+    ObsNum = _N_;
+  run;
+
+  /* 2) Sorteia N valores de ObsNum */
+  proc surveyselect data=_home_idx(keep=ObsNum)
+    out=_idx
+    method=srs
+    sampsize=&N
+    seed=&seed
+    noprint;
+  run;
+
+  /* 3) Junta para trazer as variáveis do dataset original */
+  proc sql;
+    create table sample as
+    select i.ObsNum,
+           h.Bad,
+           h.Loan,
+           h.MortDue,
+           h.Value
+    from _idx i
+    inner join _home_idx h
+      on i.ObsNum = h.ObsNum
+    order by i.ObsNum;   /* opcional: ordena pelo número original */
+  quit;
+
+%end;
+
+/* PRINT */
+footnote height=3 "Created %sysfunc(today(),nldatew.) at %sysfunc(time(), nltime.)";
+proc print data=sample noobs;
+run;
+
+title;
+footnote;
