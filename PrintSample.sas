@@ -1,4 +1,4 @@
-%let selection = FIRST;   /* FIRST ou RANDOM */
+%let selection = RANDOM;   /* FIRST ou RANDOM */
 %let N = 20;
 %let seed = 12345;
 
